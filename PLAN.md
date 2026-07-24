@@ -7,5 +7,5 @@
 5. Implement keyboard navigation, reduced motion, sound preference, mobile layout, focus management, and progress persistence.
 6. Replace starter metadata and assets, remove the temporary starter preview, and add an original social preview.
 7. Recompose the entry gate on a 12-column grid so the story leads from the left while the monument anchors the right.
-8. Add explicit left/right/forward controls, keyboard, wheel/trackpad, drag, touch, Escape return, and URL branch restoration.
+8. Replace visible direction cards with guarded mouse-edge sensing, cinematic branch previews, keyboard, wheel/trackpad, touch, Escape return, and URL branch restoration.
 9. Verify desktop and mobile layouts, eliminate document-level horizontal overflow, run lint/build/SSR tests, and copy the complete project to `D:\myweb`.

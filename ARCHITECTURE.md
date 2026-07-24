@@ -80,8 +80,8 @@ The active Nexus branch is also mirrored into `?branch=memory|idea#chapter-nexus
 
 ## Responsive behavior
 
-- Desktop: fixed cinematic viewport, vertical mainline chapters, a three-direction Nexus, full-viewport branches, and subtle pointer parallax.
-- Mobile: vertical mainline chapters over portrait-friendly crops; the Nexus direction row uses local horizontal scroll-snap and equivalent explicit buttons.
+- Desktop: fixed cinematic viewport, vertical mainline chapters, and a three-direction Nexus whose left/right edge fields preview and enter full-viewport branches after a guarded mouse dwell.
+- Mobile: vertical mainline chapters over portrait-friendly crops; the Nexus uses local horizontal swipe detection and persistent spatial direction labels rather than button cards.
 - Keyboard: Tab for controls, Enter/Space for actions, Up/Down for mainline navigation, Left/Right for Nexus branches, and Escape to return from overlays.
 - Screen readers: chapter status is announced through a polite live region; decorative visuals are hidden.
 
@@ -108,7 +108,7 @@ Configuration and copy live in `app/archive-data.ts`; interactive behavior lives
 
 - Works, About, and all public archive entries are reachable within two actions from entry.
 - The cinematic route completes without mouse-only or gesture-only interaction.
-- Memory, Forge, and Idea remain visually explicit at the Nexus and are operable by buttons, keyboard, wheel/trackpad, drag, and touch.
+- Memory, Forge, and Idea remain visually explicit at the Nexus. Mouse-edge dwell is the primary desktop interaction, with keyboard, wheel/trackpad and touch gestures retained as equivalent paths.
 - The page remains readable with images disabled, JavaScript delayed, reduced motion enabled, or audio unavailable.
 - Functional controls never use glitch distortion or low-contrast decorative styling.
 - Build succeeds and the final source is self-contained under `D:\myweb`.

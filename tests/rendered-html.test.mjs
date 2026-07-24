@@ -42,7 +42,7 @@ test("server-renders the finished archive experience", async () => {
   assert.doesNotMatch(html, /react-loading-skeleton/);
 });
 
-test("renders public archive categories, directional controls, and the sealed trace", async () => {
+test("renders public archive categories, spatial sensing, and the sealed trace", async () => {
   const response = await render();
   const html = await response.text();
 
@@ -56,9 +56,12 @@ test("renders public archive categories, directional controls, and the sealed tr
     assert.match(html, new RegExp(label));
   }
 
-  assert.match(html, /LEFT \/ MEM-03/);
-  assert.match(html, /RIGHT \/ THO-02/);
-  assert.match(html, /FORWARD \/ MAINLINE/);
+  assert.match(html, /W \/ MEM-03/);
+  assert.match(html, /THO-02 · UNSTABLE \/ E/);
+  assert.match(html, /SCROLL \/ MAINLINE/);
+  assert.match(html, /POINTER FIELD ACTIVE/);
+  assert.match(html, /中央遗迹键盘导航/);
+  assert.doesNotMatch(html, /direction-node/);
   assert.match(html, /神谕罗盘/);
   assert.match(html, /EMOTIONAL ARCHIVE \/ SEALED/);
   assert.doesNotMatch(html, /封存庭园/);

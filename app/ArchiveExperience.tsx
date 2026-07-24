@@ -19,6 +19,7 @@ import {
 } from "./archive-data";
 
 const STORAGE_KEY = "monuments-of-echoes:preferences";
+const NEXUS_DWELL_MS = 560;
 
 type SavedPreferences = {
   soundEnabled?: boolean;
@@ -127,6 +128,8 @@ export default function ArchiveExperience() {
   const [hasVisited, setHasVisited] = useState(false);
   const [lastChapter, setLastChapter] = useState<ChapterId>("boot");
   const [activeBranch, setActiveBranch] = useState<NexusBranchId | null>(null);
+  const [nexusPreview, setNexusPreview] = useState<NexusBranchId | null>(null);
+  const [nexusDwell, setNexusDwell] = useState<NexusBranchId | null>(null);
   const [relayRestored, setRelayRestored] = useState(false);
   const [ready, setReady] = useState(false);
   const sectionRefs = useRef<Array<HTMLElement | null>>([]);
@@ -141,6 +144,11 @@ export default function ArchiveExperience() {
   const wheelAccumulatorRef = useRef(0);
   const wheelResetRef = useRef<number | null>(null);
   const wheelLockedRef = useRef(false);
+  const nexusPreviewRef = useRef<NexusBranchId | null>(null);
+  const nexusDwellRef = useRef<NexusBranchId | null>(null);
+  const nexusHoverTimerRef = useRef<number | null>(null);
+  const nexusHoverAnchorRef = useRef<{ x: number; y: number } | null>(null);
+  const nexusHoverArmedRef = useRef(true);
   const currentChapter = chapters[currentIndex];
   const publicArchiveNodes = useMemo(
     () => archiveNodes.filter((node) => node.visibility === "public"),
@@ -148,6 +156,24 @@ export default function ArchiveExperience() {
   );
   const compassUnlocked =
     hasVisited || currentIndex >= chapterIndex("nexus");
+
+  const resetNexusSensing = useCallback((armed = true) => {
+    if (nexusHoverTimerRef.current) {
+      window.clearTimeout(nexusHoverTimerRef.current);
+      nexusHoverTimerRef.current = null;
+    }
+    nexusHoverAnchorRef.current = null;
+    nexusHoverArmedRef.current = armed;
+
+    if (nexusPreviewRef.current !== null) {
+      nexusPreviewRef.current = null;
+      setNexusPreview(null);
+    }
+    if (nexusDwellRef.current !== null) {
+      nexusDwellRef.current = null;
+      setNexusDwell(null);
+    }
+  }, []);
 
   const playPulse = useCallback(
     (frequency = 128) => {
@@ -195,6 +221,7 @@ export default function ArchiveExperience() {
   const scrollToChapter = useCallback(
     (index: number) => {
       const bounded = Math.max(0, Math.min(chapters.length - 1, index));
+      resetNexusSensing(true);
       setActiveBranch(null);
       sectionRefs.current[bounded]?.scrollIntoView({
         behavior: reducedMotion ? "auto" : "smooth",
@@ -209,11 +236,12 @@ export default function ArchiveExperience() {
         window.history.replaceState(null, "", url);
       }
     },
-    [reducedMotion],
+    [reducedMotion, resetNexusSensing],
   );
 
   const openBranch = useCallback(
     (branch: NexusBranchId, moveFocus = false) => {
+      resetNexusSensing(false);
       setActiveBranch(branch);
       playPulse(branch === "memory" ? 164 : 226);
 
@@ -226,22 +254,119 @@ export default function ArchiveExperience() {
         window.setTimeout(() => branchHeadingRef.current?.focus(), 80);
       }
     },
-    [playPulse],
+    [playPulse, resetNexusSensing],
   );
 
   const closeBranch = useCallback(() => {
+    resetNexusSensing(false);
     setActiveBranch(null);
     const url = new URL(window.location.href);
     url.searchParams.delete("branch");
     url.hash = "chapter-nexus";
     window.history.replaceState(null, "", url);
-  }, []);
+  }, [resetNexusSensing]);
+
+  const handleNexusPointerMove = useCallback(
+    (event: ReactPointerEvent<HTMLElement>) => {
+      if (
+        !event.isPrimary ||
+        event.pointerType !== "mouse" ||
+        currentChapter.id !== "nexus" ||
+        gateOpen ||
+        indexOpen ||
+        activeBranch ||
+        dragStartRef.current ||
+        (event.target as HTMLElement).closest(
+          "button, a, input, textarea, select, [contenteditable='true']",
+        )
+      ) {
+        return;
+      }
+
+      const bounds = event.currentTarget.getBoundingClientRect();
+      const localX = event.clientX - bounds.left;
+      const localY = event.clientY - bounds.top;
+      const ratioX = localX / bounds.width;
+      const ratioY = localY / bounds.height;
+      const previewTarget =
+        ratioX <= 0.24 ? "memory" : ratioX >= 0.76 ? "idea" : null;
+
+      if (!nexusHoverArmedRef.current) {
+        if (ratioX > 0.34 && ratioX < 0.66) {
+          nexusHoverArmedRef.current = true;
+        } else {
+          resetNexusSensing(false);
+          return;
+        }
+      }
+
+      if (nexusPreviewRef.current !== previewTarget) {
+        nexusPreviewRef.current = previewTarget;
+        setNexusPreview(previewTarget);
+      }
+
+      const edgeWidth = Math.min(160, Math.max(90, bounds.width * 0.08));
+      const insideVerticalField = ratioY >= 0.14 && ratioY <= 0.86;
+      const dwellTarget = insideVerticalField
+        ? localX <= edgeWidth
+          ? "memory"
+          : localX >= bounds.width - edgeWidth
+            ? "idea"
+            : null
+        : null;
+
+      const clearDwell = () => {
+        if (nexusHoverTimerRef.current) {
+          window.clearTimeout(nexusHoverTimerRef.current);
+          nexusHoverTimerRef.current = null;
+        }
+        nexusHoverAnchorRef.current = null;
+        if (nexusDwellRef.current !== null) {
+          nexusDwellRef.current = null;
+          setNexusDwell(null);
+        }
+      };
+
+      if (!dwellTarget) {
+        clearDwell();
+        return;
+      }
+
+      const anchor = nexusHoverAnchorRef.current;
+      const movedFromAnchor = anchor
+        ? Math.hypot(event.clientX - anchor.x, event.clientY - anchor.y)
+        : Number.POSITIVE_INFINITY;
+      const needsNewDwell =
+        nexusDwellRef.current !== dwellTarget || movedFromAnchor > 18;
+
+      if (!needsNewDwell) return;
+
+      clearDwell();
+      nexusDwellRef.current = dwellTarget;
+      setNexusDwell(dwellTarget);
+      nexusHoverAnchorRef.current = { x: event.clientX, y: event.clientY };
+      nexusHoverTimerRef.current = window.setTimeout(() => {
+        nexusHoverArmedRef.current = false;
+        openBranch(dwellTarget, false);
+      }, NEXUS_DWELL_MS);
+    },
+    [
+      activeBranch,
+      currentChapter.id,
+      gateOpen,
+      indexOpen,
+      openBranch,
+      resetNexusSensing,
+    ],
+  );
 
   const handleDirectionalPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLElement>) => {
       if (
         currentChapter.id !== "nexus" ||
         activeBranch ||
+        !event.isPrimary ||
+        (event.pointerType !== "touch" && event.pointerType !== "pen") ||
         event.button !== 0 ||
         (event.target as HTMLElement).closest("button, a")
       ) {
@@ -270,7 +395,7 @@ export default function ArchiveExperience() {
 
       const deltaX = event.clientX - start.x;
       const deltaY = event.clientY - start.y;
-      if (Math.abs(deltaX) < 72 || Math.abs(deltaX) < Math.abs(deltaY) * 1.25) {
+      if (Math.abs(deltaX) < 56 || Math.abs(deltaX) < Math.abs(deltaY) * 1.35) {
         return;
       }
 
@@ -280,11 +405,12 @@ export default function ArchiveExperience() {
   );
 
   const openArchiveIndex = useCallback(() => {
+    resetNexusSensing(true);
     previousFocus.current = document.activeElement as HTMLElement | null;
     setGateOpen(false);
     setActiveBranch(null);
     setIndexOpen(true);
-  }, []);
+  }, [resetNexusSensing]);
 
   const closeArchiveIndex = useCallback(() => {
     setIndexOpen(false);
@@ -385,6 +511,18 @@ export default function ArchiveExperience() {
       delete document.documentElement.dataset.reducedMotion;
     };
   }, [reducedMotion]);
+
+  useEffect(() => {
+    const cancelPendingSensing = () =>
+      resetNexusSensing(nexusHoverArmedRef.current);
+    window.addEventListener("blur", cancelPendingSensing);
+    return () => {
+      window.removeEventListener("blur", cancelPendingSensing);
+      if (nexusHoverTimerRef.current) {
+        window.clearTimeout(nexusHoverTimerRef.current);
+      }
+    };
+  }, [resetNexusSensing]);
 
   useEffect(() => {
     if (!ready || !window.location.hash.startsWith("#chapter-")) return;
@@ -546,8 +684,9 @@ export default function ArchiveExperience() {
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       if (
+        event.key !== "Escape" &&
         target?.matches(
-          "input, textarea, select, [contenteditable='true'], [role='slider']",
+          "button, a, input, textarea, select, [contenteditable='true'], [role='button'], [role='slider']",
         )
       ) {
         return;
@@ -615,12 +754,30 @@ export default function ArchiveExperience() {
   const currentBranch = activeBranch ? branchById(activeBranch) : null;
 
   return (
-    <main className="archive-experience" id="main">
+    <main
+      className={`archive-experience${
+        nexusPreview ? ` is-nexus-preview-${nexusPreview}` : ""
+      }`}
+      id="main"
+    >
       <a className="skip-link" href="#chapter-boot">
         跳到档案叙事
       </a>
 
       <SceneStage scene={currentChapter.scene} resolved={resolved} />
+
+      {currentChapter.id === "nexus" && !activeBranch && (
+        <div
+          className={`nexus-preview-stage${
+            nexusPreview ? ` is-${nexusPreview}` : ""
+          }`}
+          aria-hidden="true"
+        >
+          <div className="nexus-preview-image nexus-preview-memory" />
+          <div className="nexus-preview-image nexus-preview-idea" />
+          <div className="nexus-preview-grade" />
+        </div>
+      )}
 
       <div
         className={`scene-telemetry telemetry-${currentChapter.id}`}
@@ -730,10 +887,18 @@ export default function ArchiveExperience() {
             aria-roledescription={
               chapter.id === "nexus" ? "三向档案节点" : undefined
             }
+            aria-describedby={
+              chapter.id === "nexus" ? "nexus-spatial-instructions" : undefined
+            }
             onPointerDown={handleDirectionalPointerDown}
+            onPointerMove={handleNexusPointerMove}
             onPointerUp={handleDirectionalPointerUp}
+            onPointerLeave={() =>
+              resetNexusSensing(nexusHoverArmedRef.current)
+            }
             onPointerCancel={() => {
               dragStartRef.current = null;
+              resetNexusSensing(nexusHoverArmedRef.current);
             }}
           >
             <div className="chapter-copy">
@@ -800,51 +965,94 @@ export default function ArchiveExperience() {
               {chapter.id === "nexus" && (
                 <div className="nexus-navigation">
                   <div className="nexus-navigation-heading">
-                    <span>DIRECTIONAL ARCHIVE / THREE VECTORS AVAILABLE</span>
-                    <p>在此节点左右转向探索分支，或继续深入主线。</p>
+                    <span>SPATIAL ARCHIVE / POINTER FIELD ACTIVE</span>
+                    <p>让鼠标靠近画面边缘，遗迹会感应你的方向。</p>
                   </div>
+
+                  <p
+                    className="nexus-a11y-instructions"
+                    id="nexus-spatial-instructions"
+                  >
+                    鼠标移至画面左侧或右侧并短暂停留即可进入对应分支；也可使用左右方向键。向下滚动继续主线。
+                  </p>
+
                   <div
-                    className="direction-grid"
+                    className={`nexus-spatial-field${
+                      currentChapter.id === "nexus" &&
+                      !gateOpen &&
+                      !indexOpen &&
+                      !activeBranch
+                        ? " is-active"
+                        : ""
+                    }${nexusPreview ? ` is-preview-${nexusPreview}` : ""}${
+                      nexusDwell ? ` is-dwelling-${nexusDwell}` : ""
+                    }`}
+                    aria-hidden="true"
+                  >
+                    <div className="nexus-spatial-label nexus-spatial-label-memory">
+                      <span>W / MEM-03 · PARTIAL</span>
+                      <strong>
+                        <i>←</i> 人类记忆库
+                      </strong>
+                      <small>水下仍有影像回应 · 移向左侧并停留</small>
+                      <b className="nexus-dwell-line"><i /></b>
+                    </div>
+
+                    <div className="nexus-sensor-core">
+                      <span>W</span>
+                      <i />
+                      <b>NEXUS / 03</b>
+                      <i />
+                      <span>E</span>
+                    </div>
+
+                    <div className="nexus-spatial-label nexus-spatial-label-idea">
+                      <span>THO-02 · UNSTABLE / E</span>
+                      <strong>
+                        迁徙思想 <i>→</i>
+                      </strong>
+                      <small>风正在带走未完成的构思 · 移向右侧并停留</small>
+                      <b className="nexus-dwell-line"><i /></b>
+                    </div>
+
+                    <div className="nexus-forward-cue">
+                      <span>SCROLL / MAINLINE</span>
+                      <strong>继续深入遗物锻造场</strong>
+                      <i>↓</i>
+                    </div>
+                  </div>
+
+                  <div
+                    className="nexus-access-controls"
                     role="group"
-                    aria-label="中央遗迹方向选择"
+                    aria-label="中央遗迹键盘导航"
                   >
                     <button
-                      className="direction-node direction-memory"
                       type="button"
                       onClick={() => openBranch("memory", true)}
                     >
-                      <i aria-hidden="true">←</i>
-                      <span>LEFT / MEM-03</span>
-                      <strong>人类记忆库</strong>
-                      <small>水下影像 · 双生核心</small>
+                      ← 人类记忆库
                     </button>
                     <button
-                      className="direction-node direction-forward"
                       type="button"
                       onClick={() => scrollToChapter(index + 1)}
                     >
-                      <i aria-hidden="true">↓</i>
-                      <span>FORWARD / MAINLINE</span>
-                      <strong>遗物锻造场</strong>
-                      <small>继续恢复创造记录</small>
+                      ↓ 遗物锻造场
                     </button>
                     <button
-                      className="direction-node direction-idea"
                       type="button"
                       onClick={() => openBranch("idea", true)}
                     >
-                      <i aria-hidden="true">→</i>
-                      <span>RIGHT / THO-02</span>
-                      <strong>迁徙思想</strong>
-                      <small>白鸟 · 落叶 · 未完成构思</small>
+                      迁徙思想 →
                     </button>
                   </div>
+
                   <p className="direction-hint">
                     <span className="direction-hint-desktop">
-                      横向触控板 / Shift+滚轮 / 左右键 / 拖动
+                      移至画面边缘并短暂停留 · 左右键或横向触控板亦可
                     </span>
                     <span className="direction-hint-mobile">
-                      ← 左右滑动，探索记忆与思想分支 →
+                      ← 左右滑动探索分支 · 向下继续主线 →
                     </span>
                   </p>
                   <div className="sealed-trace">

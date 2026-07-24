@@ -2447,116 +2447,299 @@ button.index-node:hover {
   margin: 0;
 }
 
-.direction-grid {
-  display: grid;
-  grid-template-columns: 1fr 0.9fr 1fr;
-  gap: 1px;
-  border-top: 1px solid rgba(216, 212, 202, 0.18);
-  border-bottom: 1px solid rgba(216, 212, 202, 0.18);
-  background: rgba(216, 212, 202, 0.13);
-}
-
-.direction-node {
-  position: relative;
-  display: grid;
-  align-content: center;
-  min-height: 126px;
-  padding: 20px 24px;
+.nexus-preview-stage {
+  position: fixed;
+  z-index: 1;
+  inset: 0;
   overflow: hidden;
-  background: rgba(8, 10, 10, 0.72);
-  color: rgba(216, 212, 202, 0.72);
-  text-align: left;
-  transition:
-    background 260ms ease,
-    color 260ms ease,
-    transform 420ms var(--camera-ease);
+  pointer-events: none;
+  isolation: isolate;
 }
 
-.direction-node::after {
+.nexus-preview-image,
+.nexus-preview-grade {
   position: absolute;
-  bottom: 0;
-  width: 48px;
+  inset: 0;
+}
+
+.nexus-preview-image {
+  opacity: 0;
+  background-position: center;
+  background-size: cover;
+  filter: saturate(0.48) brightness(0.54) contrast(1.16);
+  transform: scale(1.045);
+  transition:
+    opacity 320ms ease,
+    transform 760ms var(--camera-ease);
+}
+
+.nexus-preview-memory {
+  background-image: url("/images/memory-reservoir.png");
+  background-position: 40% center;
+  -webkit-mask-image: linear-gradient(90deg, #000 0 34%, rgba(0, 0, 0, 0.86) 56%, transparent 90%);
+  mask-image: linear-gradient(90deg, #000 0 34%, rgba(0, 0, 0, 0.86) 56%, transparent 90%);
+}
+
+.nexus-preview-idea {
+  background-image: url("/images/migrating-thoughts.png");
+  background-position: 62% center;
+  -webkit-mask-image: linear-gradient(270deg, #000 0 34%, rgba(0, 0, 0, 0.86) 56%, transparent 90%);
+  mask-image: linear-gradient(270deg, #000 0 34%, rgba(0, 0, 0, 0.86) 56%, transparent 90%);
+}
+
+.nexus-preview-stage.is-memory .nexus-preview-memory,
+.nexus-preview-stage.is-idea .nexus-preview-idea {
+  opacity: 0.58;
+  transform: scale(1);
+}
+
+.nexus-preview-grade {
+  z-index: 2;
+  background: linear-gradient(180deg, rgba(5, 7, 7, 0.22), transparent 46%, rgba(5, 7, 7, 0.54));
+}
+
+.scene-nexus .scene-image-nexus {
+  transition:
+    filter 520ms ease,
+    transform 680ms var(--camera-ease);
+}
+
+.archive-experience.is-nexus-preview-memory .scene-nexus .scene-image-nexus {
+  filter: saturate(0.48) brightness(0.5) contrast(1.14);
+  transform: scale(1.035) translateX(2.4vw);
+}
+
+.archive-experience.is-nexus-preview-idea .scene-nexus .scene-image-nexus {
+  filter: saturate(0.48) brightness(0.5) contrast(1.14);
+  transform: scale(1.035) translateX(-2.4vw);
+}
+
+.nexus-a11y-instructions {
+  position: absolute;
+  width: 1px;
   height: 1px;
-  content: "";
-  background: var(--gold);
-  transition: width 320ms var(--camera-ease);
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
-.direction-memory::after {
-  left: 0;
+.nexus-spatial-field {
+  position: fixed;
+  z-index: 18;
+  inset: 0;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 260ms ease, visibility 260ms step-end;
 }
 
-.direction-idea::after {
-  right: 0;
+.nexus-spatial-field.is-active {
+  visibility: visible;
+  opacity: 1;
+  transition: opacity 420ms ease, visibility 0ms step-start;
 }
 
-.direction-forward::after {
-  right: calc(50% - 24px);
+.nexus-spatial-label {
+  position: absolute;
+  width: min(300px, 24vw);
+  color: rgba(216, 212, 202, 0.62);
+  transition:
+    opacity 260ms ease,
+    color 260ms ease,
+    transform 520ms var(--camera-ease);
 }
 
-.direction-node:hover,
-.direction-node:focus-visible {
-  background: rgba(169, 140, 88, 0.12);
-  color: var(--bone);
+.nexus-spatial-label-memory {
+  top: 66%;
+  left: var(--page-gutter);
 }
 
-.direction-node:hover::after,
-.direction-node:focus-visible::after {
-  width: 96px;
-}
-
-.direction-memory:hover {
-  transform: translateX(-6px);
-}
-
-.direction-idea {
+.nexus-spatial-label-idea {
+  top: 53%;
+  right: var(--page-gutter);
   text-align: right;
 }
 
-.direction-idea:hover {
-  transform: translateX(6px);
-}
-
-.direction-forward {
-  text-align: center;
-}
-
-.direction-node > i {
-  position: absolute;
-  top: 18px;
+.nexus-spatial-label > span {
+  display: block;
+  margin-bottom: 10px;
   color: var(--gold-bright);
-  font: 24px/1 var(--font-display);
+  font: 8px/1 var(--font-mono);
+  letter-spacing: 0.14em;
+}
+
+.nexus-spatial-label > strong {
+  display: block;
+  font: 400 clamp(24px, 1.7vw, 34px)/1.12 var(--font-display);
+  letter-spacing: 0.03em;
+}
+
+.nexus-spatial-label > strong i {
+  color: var(--gold-bright);
   font-style: normal;
 }
 
-.direction-memory > i {
-  left: 22px;
+.nexus-spatial-label > small {
+  display: block;
+  margin-top: 10px;
+  color: rgba(216, 212, 202, 0.38);
+  font: 9px/1.5 var(--font-body);
+  letter-spacing: 0.05em;
+  opacity: 0;
+  transform: translateY(5px);
+  transition: opacity 240ms ease, transform 320ms var(--camera-ease);
 }
 
-.direction-forward > i {
-  left: calc(50% - 6px);
+.nexus-dwell-line {
+  position: relative;
+  display: block;
+  width: 112px;
+  height: 1px;
+  margin-top: 16px;
+  overflow: hidden;
+  background: rgba(216, 212, 202, 0.18);
 }
 
-.direction-idea > i {
-  right: 22px;
+.nexus-spatial-label-idea .nexus-dwell-line {
+  margin-left: auto;
 }
 
-.direction-node > span {
-  margin: 22px 0 8px;
-  color: var(--gold-bright);
-  font: 8px/1 var(--font-mono);
+.nexus-dwell-line > i {
+  position: absolute;
+  inset: 0;
+  background: var(--gold-bright);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+.nexus-spatial-label-idea .nexus-dwell-line > i {
+  transform-origin: right;
+}
+
+.nexus-spatial-field.is-preview-memory .nexus-spatial-label-memory,
+.nexus-spatial-field.is-preview-idea .nexus-spatial-label-idea {
+  color: var(--bone);
+  transform: translateX(0);
+}
+
+.nexus-spatial-field.is-preview-memory .nexus-spatial-label-idea,
+.nexus-spatial-field.is-preview-idea .nexus-spatial-label-memory {
+  opacity: 0.2;
+}
+
+.nexus-spatial-field.is-preview-memory .nexus-spatial-label-memory > small,
+.nexus-spatial-field.is-preview-idea .nexus-spatial-label-idea > small {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.nexus-spatial-field.is-dwelling-memory .nexus-spatial-label-memory .nexus-dwell-line > i,
+.nexus-spatial-field.is-dwelling-idea .nexus-spatial-label-idea .nexus-dwell-line > i {
+  animation: nexus-dwell-fill 560ms linear forwards;
+}
+
+.nexus-sensor-core {
+  position: absolute;
+  top: 51%;
+  left: 50%;
+  display: grid;
+  grid-template-columns: auto 42px auto 42px auto;
+  align-items: center;
+  gap: 10px;
+  color: rgba(216, 212, 202, 0.32);
+  font: 7px/1 var(--font-mono);
   letter-spacing: 0.12em;
+  transform: translate(-50%, -50%);
+  transition: opacity 260ms ease;
 }
 
-.direction-node > strong {
-  font: 400 20px/1.2 var(--font-display);
+.nexus-sensor-core i {
+  height: 1px;
+  background: rgba(169, 140, 88, 0.34);
 }
 
-.direction-node > small {
+.nexus-sensor-core b {
+  color: rgba(216, 212, 202, 0.46);
+  font-weight: 400;
+}
+
+.nexus-forward-cue {
+  position: absolute;
+  bottom: 44px;
+  left: 50%;
+  display: grid;
+  justify-items: center;
+  color: rgba(216, 212, 202, 0.42);
+  text-align: center;
+  transform: translateX(-50%);
+}
+
+.nexus-forward-cue span {
+  color: var(--gold-bright);
+  font: 7px/1 var(--font-mono);
+  letter-spacing: 0.14em;
+}
+
+.nexus-forward-cue strong {
   margin-top: 7px;
-  color: rgba(216, 212, 202, 0.4);
-  font: 9px/1.4 var(--font-body);
-  letter-spacing: 0.04em;
+  font: 400 13px/1.2 var(--font-body);
+}
+
+.nexus-forward-cue > i {
+  margin-top: 9px;
+  color: var(--gold-bright);
+  font: 18px/1 var(--font-display);
+  font-style: normal;
+  animation: forward-cue 2.4s ease-in-out infinite;
+}
+
+.nexus-access-controls {
+  position: fixed;
+  z-index: 42;
+  bottom: 78px;
+  left: 50%;
+  display: flex;
+  width: 1px;
+  height: 1px;
+  gap: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.nexus-access-controls:focus-within {
+  width: auto;
+  height: auto;
+  overflow: visible;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.nexus-access-controls button {
+  min-height: 42px;
+  padding: 0 18px;
+  border: 0;
+  border-bottom: 1px solid rgba(169, 140, 88, 0.5);
+  background: rgba(7, 9, 9, 0.88);
+  color: var(--bone);
+  font: 9px/1 var(--font-mono);
+  letter-spacing: 0.08em;
+}
+
+.nexus-access-controls button:focus-visible {
+  background: rgba(169, 140, 88, 0.16);
+  outline: 1px solid var(--gold-bright);
+  outline-offset: 3px;
+}
+
+@keyframes nexus-dwell-fill {
+  to {
+    transform: scaleX(1);
+  }
 }
 
 .direction-hint {
@@ -2877,9 +3060,8 @@ button.index-node:hover {
     width: min(920px, 88vw);
   }
 
-  .direction-node {
-    min-height: 118px;
-    padding-inline: 18px;
+  .nexus-spatial-label {
+    width: min(260px, 26vw);
   }
 
   .oracle-label {
@@ -2944,27 +3126,6 @@ button.index-node:hover {
     gap: 7px;
   }
 
-  .direction-grid {
-    display: flex;
-    width: 100%;
-    min-width: 0;
-    max-width: 100%;
-    gap: 10px;
-    margin-right: -20px;
-    padding: 1px 20px 10px 0;
-    overflow-x: auto;
-    border: 0;
-    background: transparent;
-    scroll-snap-type: x mandatory;
-    overscroll-behavior-x: contain;
-    touch-action: pan-x;
-    scrollbar-width: none;
-  }
-
-  .direction-grid::-webkit-scrollbar {
-    display: none;
-  }
-
   .direction-hint-desktop {
     display: none;
   }
@@ -2973,17 +3134,52 @@ button.index-node:hover {
     display: inline;
   }
 
-  .direction-node {
-    flex: 0 0 min(76vw, 320px);
-    min-height: 118px;
-    border-top: 1px solid rgba(216, 212, 202, 0.18);
-    border-bottom: 1px solid rgba(216, 212, 202, 0.18);
-    scroll-snap-align: start;
+  .nexus-spatial-label {
+    top: auto;
+    bottom: 128px;
+    width: 42vw;
   }
 
-  .direction-memory:hover,
-  .direction-idea:hover {
-    transform: none;
+  .nexus-spatial-label-memory {
+    left: 20px;
+  }
+
+  .nexus-spatial-label-idea {
+    right: 20px;
+  }
+
+  .nexus-spatial-label > strong {
+    font-size: clamp(18px, 5vw, 22px);
+  }
+
+  .nexus-spatial-label > small {
+    display: none;
+  }
+
+  .nexus-dwell-line {
+    width: 72px;
+    margin-top: 11px;
+  }
+
+  .nexus-sensor-core {
+    top: 42%;
+    grid-template-columns: auto 18px auto 18px auto;
+    gap: 6px;
+  }
+
+  .nexus-forward-cue {
+    bottom: 26px;
+  }
+
+  .nexus-forward-cue strong {
+    display: none;
+  }
+
+  .nexus-access-controls:focus-within {
+    bottom: 72px;
+    display: grid;
+    width: calc(100vw - 40px);
+    grid-template-columns: 1fr;
   }
 
   .oracle-compass {
@@ -3137,10 +3333,6 @@ button.index-node:hover {
 
   .gate-preferences > span {
     flex-basis: 100%;
-  }
-
-  .direction-node {
-    flex-basis: min(76vw, 300px);
   }
 
   .branch-actions,
