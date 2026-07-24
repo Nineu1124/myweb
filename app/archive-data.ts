@@ -6,7 +6,13 @@ export type ChapterId =
   | "forge"
   | "identity";
 
-export type SceneId = "void" | "wasteland" | "relay" | "nexus" | "forge" | "identity";
+export type SceneId =
+  | "void"
+  | "wasteland"
+  | "relay"
+  | "nexus"
+  | "forge"
+  | "identity";
 
 export type Chapter = {
   id: ChapterId;
@@ -84,6 +90,58 @@ export const chapters: Chapter[] = [
   },
 ];
 
+export type NexusBranchId = "memory" | "idea";
+
+export type NexusBranch = {
+  id: NexusBranchId;
+  direction: "left" | "right";
+  code: string;
+  titleEn: string;
+  titleZh: string;
+  systemLabel: string;
+  description: string;
+  quote: string;
+  image: string;
+  records: string[];
+};
+
+export const nexusBranches: NexusBranch[] = [
+  {
+    id: "memory",
+    direction: "left",
+    code: "MEM-03",
+    titleEn: "Human Memory Reservoir",
+    titleZh: "人类记忆库",
+    systemLabel: "MEMORY SOURCE // PARTIAL",
+    description:
+      "水面保存了无法完整复原的旅行、影像与人生片段。两枚远处的核心以相同频率闪烁，但公共系统拒绝继续靠近。",
+    quote: "记忆保存那些拒绝消失的东西。",
+    image: "/images/memory-reservoir.png",
+    records: [
+      "PERSONAL FOOTAGE / FRAGMENTED",
+      "TRAVEL RECORD / RECOVERABLE",
+      "DUAL CORE / ACCESS DENIED",
+    ],
+  },
+  {
+    id: "idea",
+    direction: "right",
+    code: "THO-02",
+    titleEn: "The Migrating Thoughts",
+    titleZh: "迁徙思想",
+    systemLabel: "THOUGHT SOURCE // UNSTABLE",
+    description:
+      "风经过失效的花园，未完成的构思从石碑、落叶与白鸟之间迁徙。它们没有消失，只是拒绝停留在原处。",
+    quote: "思想并不消失。它们只是迁徙。",
+    image: "/images/migrating-thoughts.png",
+    records: [
+      "DESIGN NOTES / ACTIVE",
+      "UNFINISHED PLANS / MIGRATING",
+      "IDEA LINEAGE / PARTIAL",
+    ],
+  },
+];
+
 export type ArchiveNode = {
   id: "mail" | "idea" | "memory" | "works" | "about" | "love";
   code: string;
@@ -92,6 +150,9 @@ export type ArchiveNode = {
   summary: string;
   status: "online" | "partial" | "active" | "sealed";
   target: ChapterId;
+  direction: "forward" | "west" | "east" | "hidden";
+  visibility: "public" | "hidden";
+  discoveredByDefault: boolean;
 };
 
 export const archiveNodes: ArchiveNode[] = [
@@ -103,6 +164,9 @@ export const archiveNodes: ArchiveNode[] = [
     summary: "通信、来信与仍在重试的连接。",
     status: "partial",
     target: "relay",
+    direction: "forward",
+    visibility: "public",
+    discoveredByDefault: true,
   },
   {
     id: "idea",
@@ -112,6 +176,9 @@ export const archiveNodes: ArchiveNode[] = [
     summary: "随想、灵感与尚未完成的计划。",
     status: "online",
     target: "nexus",
+    direction: "east",
+    visibility: "public",
+    discoveredByDefault: false,
   },
   {
     id: "memory",
@@ -121,6 +188,9 @@ export const archiveNodes: ArchiveNode[] = [
     summary: "影像、经历与拒绝消失的片段。",
     status: "partial",
     target: "nexus",
+    direction: "west",
+    visibility: "public",
+    discoveredByDefault: false,
   },
   {
     id: "works",
@@ -130,6 +200,9 @@ export const archiveNodes: ArchiveNode[] = [
     summary: "网站、软件、AI实验与持续迭代的作品。",
     status: "active",
     target: "forge",
+    direction: "forward",
+    visibility: "public",
+    discoveredByDefault: false,
   },
   {
     id: "about",
@@ -139,6 +212,9 @@ export const archiveNodes: ArchiveNode[] = [
     summary: "关于档案对象、技能、兴趣与外部链路。",
     status: "active",
     target: "identity",
+    direction: "forward",
+    visibility: "public",
+    discoveredByDefault: false,
   },
   {
     id: "love",
@@ -148,6 +224,9 @@ export const archiveNodes: ArchiveNode[] = [
     summary: "一组从未进入公共索引的双生记忆。",
     status: "sealed",
     target: "nexus",
+    direction: "hidden",
+    visibility: "hidden",
+    discoveredByDefault: false,
   },
 ];
 

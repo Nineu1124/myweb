@@ -42,7 +42,7 @@ test("server-renders the finished archive experience", async () => {
   assert.doesNotMatch(html, /react-loading-skeleton/);
 });
 
-test("renders all public archive categories and the sealed trace", async () => {
+test("renders public archive categories, directional controls, and the sealed trace", async () => {
   const response = await render();
   const html = await response.text();
 
@@ -52,12 +52,16 @@ test("renders all public archive categories and the sealed trace", async () => {
     "人类记忆库",
     "遗物锻造场",
     "身份恢复",
-    "封存庭园",
   ]) {
     assert.match(html, new RegExp(label));
   }
 
+  assert.match(html, /LEFT \/ MEM-03/);
+  assert.match(html, /RIGHT \/ THO-02/);
+  assert.match(html, /FORWARD \/ MAINLINE/);
+  assert.match(html, /神谕罗盘/);
   assert.match(html, /EMOTIONAL ARCHIVE \/ SEALED/);
+  assert.doesNotMatch(html, /封存庭园/);
   assert.match(html, /SOURCE SIGNAL/);
   assert.match(html, /ACTIVE/);
 });

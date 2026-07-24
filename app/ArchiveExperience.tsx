@@ -6,13 +6,16 @@ import {
   useMemo,
   useRef,
   useState,
+  type PointerEvent as ReactPointerEvent,
 } from "react";
 import {
   archiveNodes,
   artifactRecords,
   chapters,
+  nexusBranches,
   type ArchiveNode,
   type ChapterId,
+  type NexusBranchId,
 } from "./archive-data";
 
 const STORAGE_KEY = "monuments-of-echoes:preferences";
@@ -24,23 +27,12 @@ type SavedPreferences = {
   lastChapter?: ChapterId;
 };
 
-type TraceId = "idea" | "memory" | null;
-
-const traceCopy = {
-  idea: {
-    code: "THOUGHT SOURCE // UNSTABLE",
-    title: "思想并不消失。它们只是迁徙。",
-    body: "风经过失效的花园，未完成的构思从石碑与叶片之间重新浮现。",
-  },
-  memory: {
-    code: "MEMORY SOURCE // PARTIAL",
-    title: "记忆保存那些拒绝消失的东西。",
-    body: "水下档案只能恢复局部影像。远处有两枚核心以相同频率短暂闪烁。",
-  },
-};
-
 function chapterIndex(id: ChapterId) {
   return chapters.findIndex((chapter) => chapter.id === id);
+}
+
+function branchById(id: NexusBranchId) {
+  return nexusBranches.find((branch) => branch.id === id)!;
 }
 
 function EchoSeal({ resolved = false }: { resolved?: boolean }) {
@@ -134,13 +126,28 @@ export default function ArchiveExperience() {
   const [reducedMotion, setReducedMotion] = useState(false);
   const [hasVisited, setHasVisited] = useState(false);
   const [lastChapter, setLastChapter] = useState<ChapterId>("boot");
-  const [selectedTrace, setSelectedTrace] = useState<TraceId>(null);
+  const [activeBranch, setActiveBranch] = useState<NexusBranchId | null>(null);
   const [relayRestored, setRelayRestored] = useState(false);
   const [ready, setReady] = useState(false);
   const sectionRefs = useRef<Array<HTMLElement | null>>([]);
   const indexRef = useRef<HTMLDivElement | null>(null);
+  const branchHeadingRef = useRef<HTMLHeadingElement | null>(null);
   const previousFocus = useRef<HTMLElement | null>(null);
+  const dragStartRef = useRef<{
+    x: number;
+    y: number;
+    pointerId: number;
+  } | null>(null);
+  const wheelAccumulatorRef = useRef(0);
+  const wheelResetRef = useRef<number | null>(null);
+  const wheelLockedRef = useRef(false);
   const currentChapter = chapters[currentIndex];
+  const publicArchiveNodes = useMemo(
+    () => archiveNodes.filter((node) => node.visibility === "public"),
+    [],
+  );
+  const compassUnlocked =
+    hasVisited || currentIndex >= chapterIndex("nexus");
 
   const playPulse = useCallback(
     (frequency = 128) => {
@@ -188,18 +195,94 @@ export default function ArchiveExperience() {
   const scrollToChapter = useCallback(
     (index: number) => {
       const bounded = Math.max(0, Math.min(chapters.length - 1, index));
+      setActiveBranch(null);
       sectionRefs.current[bounded]?.scrollIntoView({
         behavior: reducedMotion ? "auto" : "smooth",
         block: "start",
       });
       setCurrentIndex(bounded);
+
+      if (typeof window !== "undefined") {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("branch");
+        url.hash = `chapter-${chapters[bounded].id}`;
+        window.history.replaceState(null, "", url);
+      }
     },
     [reducedMotion],
+  );
+
+  const openBranch = useCallback(
+    (branch: NexusBranchId, moveFocus = false) => {
+      setActiveBranch(branch);
+      playPulse(branch === "memory" ? 164 : 226);
+
+      const url = new URL(window.location.href);
+      url.searchParams.set("branch", branch);
+      url.hash = "chapter-nexus";
+      window.history.replaceState(null, "", url);
+
+      if (moveFocus) {
+        window.setTimeout(() => branchHeadingRef.current?.focus(), 80);
+      }
+    },
+    [playPulse],
+  );
+
+  const closeBranch = useCallback(() => {
+    setActiveBranch(null);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("branch");
+    url.hash = "chapter-nexus";
+    window.history.replaceState(null, "", url);
+  }, []);
+
+  const handleDirectionalPointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLElement>) => {
+      if (
+        currentChapter.id !== "nexus" ||
+        activeBranch ||
+        event.button !== 0 ||
+        (event.target as HTMLElement).closest("button, a")
+      ) {
+        return;
+      }
+
+      dragStartRef.current = {
+        x: event.clientX,
+        y: event.clientY,
+        pointerId: event.pointerId,
+      };
+      event.currentTarget.setPointerCapture(event.pointerId);
+    },
+    [activeBranch, currentChapter.id],
+  );
+
+  const handleDirectionalPointerUp = useCallback(
+    (event: ReactPointerEvent<HTMLElement>) => {
+      const start = dragStartRef.current;
+      dragStartRef.current = null;
+      if (!start || start.pointerId !== event.pointerId) return;
+
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+
+      const deltaX = event.clientX - start.x;
+      const deltaY = event.clientY - start.y;
+      if (Math.abs(deltaX) < 72 || Math.abs(deltaX) < Math.abs(deltaY) * 1.25) {
+        return;
+      }
+
+      openBranch(deltaX > 0 ? "memory" : "idea");
+    },
+    [openBranch],
   );
 
   const openArchiveIndex = useCallback(() => {
     previousFocus.current = document.activeElement as HTMLElement | null;
     setGateOpen(false);
+    setActiveBranch(null);
     setIndexOpen(true);
   }, []);
 
@@ -213,6 +296,7 @@ export default function ArchiveExperience() {
       const startIndex = resume ? Math.max(0, chapterIndex(lastChapter)) : 0;
       setGateOpen(false);
       setIndexOpen(false);
+      setActiveBranch(null);
       window.setTimeout(() => scrollToChapter(startIndex), 30);
       playPulse(96);
     },
@@ -222,13 +306,15 @@ export default function ArchiveExperience() {
   const chooseNode = useCallback(
     (node: ArchiveNode) => {
       if (node.status === "sealed") return;
-      if (node.id === "idea" || node.id === "memory") {
-        setSelectedTrace(node.id);
-      }
+      const branch =
+        node.id === "idea" || node.id === "memory" ? node.id : null;
       closeArchiveIndex();
-      window.setTimeout(() => scrollToChapter(chapterIndex(node.target)), 30);
+      window.setTimeout(() => {
+        scrollToChapter(chapterIndex(node.target));
+        if (branch) window.setTimeout(() => openBranch(branch), 420);
+      }, 30);
     },
-    [closeArchiveIndex, scrollToChapter],
+    [closeArchiveIndex, openBranch, scrollToChapter],
   );
 
   useEffect(() => {
@@ -284,9 +370,52 @@ export default function ArchiveExperience() {
   ]);
 
   useEffect(() => {
-    document.body.classList.toggle("is-overlay-open", gateOpen || indexOpen);
-    return () => document.body.classList.remove("is-overlay-open");
-  }, [gateOpen, indexOpen]);
+    const overlayOpen = gateOpen || indexOpen || Boolean(activeBranch);
+    document.documentElement.classList.toggle("is-overlay-open", overlayOpen);
+    document.body.classList.toggle("is-overlay-open", overlayOpen);
+    return () => {
+      document.documentElement.classList.remove("is-overlay-open");
+      document.body.classList.remove("is-overlay-open");
+    };
+  }, [activeBranch, gateOpen, indexOpen]);
+
+  useEffect(() => {
+    document.documentElement.dataset.reducedMotion = String(reducedMotion);
+    return () => {
+      delete document.documentElement.dataset.reducedMotion;
+    };
+  }, [reducedMotion]);
+
+  useEffect(() => {
+    if (!ready || !window.location.hash.startsWith("#chapter-")) return;
+
+    const chapterId = window.location.hash.replace(
+      "#chapter-",
+      "",
+    ) as ChapterId;
+    const nextIndex = chapterIndex(chapterId);
+    if (nextIndex < 0) return;
+
+    const branch = new URL(window.location.href).searchParams.get("branch");
+    const restoreTimer = window.setTimeout(() => {
+      setGateOpen(false);
+      setHasVisited(true);
+      setCurrentIndex(nextIndex);
+      sectionRefs.current[nextIndex]?.scrollIntoView({
+        behavior: "auto",
+        block: "start",
+      });
+
+      if (
+        chapterId === "nexus" &&
+        (branch === "memory" || branch === "idea")
+      ) {
+        setActiveBranch(branch);
+      }
+    }, 0);
+
+    return () => window.clearTimeout(restoreTimer);
+  }, [ready]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -355,6 +484,65 @@ export default function ArchiveExperience() {
   }, [currentIndex, gateOpen, indexOpen, playPulse]);
 
   useEffect(() => {
+    if (
+      gateOpen ||
+      indexOpen ||
+      activeBranch ||
+      currentChapter.id !== "nexus"
+    ) {
+      wheelAccumulatorRef.current = 0;
+      return;
+    }
+
+    const onWheel = (event: WheelEvent) => {
+      if (
+        event.ctrlKey ||
+        (event.target as HTMLElement).closest("button, a, input, textarea")
+      ) {
+        return;
+      }
+
+      const scale =
+        event.deltaMode === WheelEvent.DOM_DELTA_LINE
+          ? 16
+          : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+            ? window.innerWidth
+            : 1;
+      const horizontalDelta =
+        (event.shiftKey ? event.deltaY : event.deltaX) * scale;
+      const verticalDelta = event.deltaY * scale;
+      const horizontalIntent =
+        event.shiftKey ||
+        Math.abs(horizontalDelta) > Math.abs(verticalDelta) * 1.25;
+
+      if (!horizontalIntent || Math.abs(horizontalDelta) < 2) return;
+      event.preventDefault();
+      if (wheelLockedRef.current) return;
+
+      wheelAccumulatorRef.current += horizontalDelta;
+      if (wheelResetRef.current) window.clearTimeout(wheelResetRef.current);
+      wheelResetRef.current = window.setTimeout(() => {
+        wheelAccumulatorRef.current = 0;
+      }, 160);
+
+      if (Math.abs(wheelAccumulatorRef.current) < 60) return;
+
+      wheelLockedRef.current = true;
+      openBranch(wheelAccumulatorRef.current > 0 ? "idea" : "memory");
+      wheelAccumulatorRef.current = 0;
+      window.setTimeout(() => {
+        wheelLockedRef.current = false;
+      }, 700);
+    };
+
+    window.addEventListener("wheel", onWheel, { passive: false });
+    return () => {
+      window.removeEventListener("wheel", onWheel);
+      if (wheelResetRef.current) window.clearTimeout(wheelResetRef.current);
+    };
+  }, [activeBranch, currentChapter.id, gateOpen, indexOpen, openBranch]);
+
+  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       if (
@@ -366,13 +554,38 @@ export default function ArchiveExperience() {
       }
 
       if (event.key === "Escape") {
+        if (!activeBranch && !indexOpen) return;
         event.preventDefault();
-        if (indexOpen) closeArchiveIndex();
-        else openArchiveIndex();
+        if (activeBranch) closeBranch();
+        else closeArchiveIndex();
         return;
       }
 
       if (gateOpen || indexOpen) return;
+
+      if (activeBranch) {
+        if (
+          (activeBranch === "memory" && event.key === "ArrowRight") ||
+          (activeBranch === "idea" && event.key === "ArrowLeft")
+        ) {
+          event.preventDefault();
+          closeBranch();
+        }
+        return;
+      }
+
+      if (currentChapter.id === "nexus" && event.key === "ArrowLeft") {
+        event.preventDefault();
+        openBranch("memory", true);
+        return;
+      }
+
+      if (currentChapter.id === "nexus" && event.key === "ArrowRight") {
+        event.preventDefault();
+        openBranch("idea", true);
+        return;
+      }
+
       if (event.key === "ArrowDown" || event.key === "PageDown") {
         event.preventDefault();
         scrollToChapter(currentIndex + 1);
@@ -386,16 +599,20 @@ export default function ArchiveExperience() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [
+    activeBranch,
     closeArchiveIndex,
+    closeBranch,
     currentIndex,
+    currentChapter.id,
     gateOpen,
     indexOpen,
-    openArchiveIndex,
+    openBranch,
     scrollToChapter,
   ]);
 
   const progress = ((currentIndex + 1) / chapters.length) * 100;
   const resolved = currentChapter.id === "identity";
+  const currentBranch = activeBranch ? branchById(activeBranch) : null;
 
   return (
     <main className="archive-experience" id="main">
@@ -404,6 +621,21 @@ export default function ArchiveExperience() {
       </a>
 
       <SceneStage scene={currentChapter.scene} resolved={resolved} />
+
+      <div
+        className={`scene-telemetry telemetry-${currentChapter.id}`}
+        aria-hidden="true"
+      >
+        <span>ARCHIVE VECTOR / {currentChapter.sequence}</span>
+        <div className="telemetry-orbit">
+          <i />
+          <i />
+          <i />
+          <b />
+        </div>
+        <p>{currentChapter.systemLabel}</p>
+        <small>LAT / UNKNOWN · ERA / UNRESOLVED</small>
+      </div>
 
       <header className="system-rail">
         <button
@@ -423,9 +655,6 @@ export default function ArchiveExperience() {
         </button>
 
         <nav className="utility-nav" aria-label="全局控制">
-          <button type="button" onClick={openArchiveIndex}>
-            档案索引
-          </button>
           <button
             type="button"
             aria-pressed={soundEnabled}
@@ -443,6 +672,40 @@ export default function ArchiveExperience() {
         </nav>
       </header>
 
+      <button
+        className={`oracle-compass${compassUnlocked ? " is-unlocked" : ""}`}
+        type="button"
+        onClick={openArchiveIndex}
+        disabled={!compassUnlocked}
+        aria-label={
+          compassUnlocked
+            ? "打开神谕罗盘与档案索引"
+            : "神谕罗盘将在中央遗迹解锁"
+        }
+      >
+        <span className="oracle-rings" aria-hidden="true">
+          <i />
+          <i />
+          <i />
+          <b />
+        </span>
+        <span className="oracle-label">
+          <small>{compassUnlocked ? "ORACLE COMPASS" : "NODE LOCKED"}</small>
+          <strong>{compassUnlocked ? "档案导航" : "抵达中央遗迹后解锁"}</strong>
+        </span>
+      </button>
+
+      <div
+        className={`input-legend${
+          currentChapter.id === "nexus" ? " is-directional" : ""
+        }`}
+        aria-hidden="true"
+      >
+        <span>↑ ↓ 主线</span>
+        <i />
+        <span>← → 分支</span>
+      </div>
+
       <div className="chapter-status" aria-hidden="true">
         <span>{currentChapter.sequence}</span>
         <div className="status-track">
@@ -454,7 +717,9 @@ export default function ArchiveExperience() {
       <div className="experience-scroll">
         {chapters.map((chapter, index) => (
           <section
-            className={`chapter chapter-${chapter.id}`}
+            className={`chapter chapter-${chapter.id}${
+              chapter.id === "nexus" ? " is-directional" : ""
+            }`}
             data-chapter-index={index}
             id={`chapter-${chapter.id}`}
             key={chapter.id}
@@ -462,6 +727,14 @@ export default function ArchiveExperience() {
               sectionRefs.current[index] = node;
             }}
             aria-labelledby={`title-${chapter.id}`}
+            aria-roledescription={
+              chapter.id === "nexus" ? "三向档案节点" : undefined
+            }
+            onPointerDown={handleDirectionalPointerDown}
+            onPointerUp={handleDirectionalPointerUp}
+            onPointerCancel={() => {
+              dragStartRef.current = null;
+            }}
           >
             <div className="chapter-copy">
               <div className="chapter-meta">
@@ -525,38 +798,55 @@ export default function ArchiveExperience() {
               )}
 
               {chapter.id === "nexus" && (
-                <div className="trace-selector">
-                  <div className="trace-buttons">
+                <div className="nexus-navigation">
+                  <div className="nexus-navigation-heading">
+                    <span>DIRECTIONAL ARCHIVE / THREE VECTORS AVAILABLE</span>
+                    <p>在此节点左右转向探索分支，或继续深入主线。</p>
+                  </div>
+                  <div
+                    className="direction-grid"
+                    role="group"
+                    aria-label="中央遗迹方向选择"
+                  >
                     <button
+                      className="direction-node direction-memory"
                       type="button"
-                      aria-pressed={selectedTrace === "idea"}
-                      onClick={() => {
-                        setSelectedTrace("idea");
-                        playPulse(226);
-                      }}
+                      onClick={() => openBranch("memory", true)}
                     >
-                      <span>THOUGHT / 02</span>
-                      读取思想回响
+                      <i aria-hidden="true">←</i>
+                      <span>LEFT / MEM-03</span>
+                      <strong>人类记忆库</strong>
+                      <small>水下影像 · 双生核心</small>
                     </button>
                     <button
+                      className="direction-node direction-forward"
                       type="button"
-                      aria-pressed={selectedTrace === "memory"}
-                      onClick={() => {
-                        setSelectedTrace("memory");
-                        playPulse(164);
-                      }}
+                      onClick={() => scrollToChapter(index + 1)}
                     >
-                      <span>MEMORY / 03</span>
-                      读取记忆回响
+                      <i aria-hidden="true">↓</i>
+                      <span>FORWARD / MAINLINE</span>
+                      <strong>遗物锻造场</strong>
+                      <small>继续恢复创造记录</small>
+                    </button>
+                    <button
+                      className="direction-node direction-idea"
+                      type="button"
+                      onClick={() => openBranch("idea", true)}
+                    >
+                      <i aria-hidden="true">→</i>
+                      <span>RIGHT / THO-02</span>
+                      <strong>迁徙思想</strong>
+                      <small>白鸟 · 落叶 · 未完成构思</small>
                     </button>
                   </div>
-                  {selectedTrace && (
-                    <div className="trace-result" role="status">
-                      <span>{traceCopy[selectedTrace].code}</span>
-                      <strong>{traceCopy[selectedTrace].title}</strong>
-                      <p>{traceCopy[selectedTrace].body}</p>
-                    </div>
-                  )}
+                  <p className="direction-hint">
+                    <span className="direction-hint-desktop">
+                      横向触控板 / Shift+滚轮 / 左右键 / 拖动
+                    </span>
+                    <span className="direction-hint-mobile">
+                      ← 左右滑动，探索记忆与思想分支 →
+                    </span>
+                  </p>
                   <div className="sealed-trace">
                     <span className="dual-ring" aria-hidden="true">
                       <i />
@@ -564,6 +854,13 @@ export default function ArchiveExperience() {
                     </span>
                     EMOTIONAL ARCHIVE / SEALED
                   </div>
+                  <button
+                    className="nexus-back"
+                    type="button"
+                    onClick={() => scrollToChapter(index - 1)}
+                  >
+                    ↑ 返回通讯中继站
+                  </button>
                 </div>
               )}
 
@@ -602,7 +899,7 @@ export default function ArchiveExperience() {
                 </div>
               )}
 
-              <div className="chapter-actions">
+              {chapter.id !== "nexus" && <div className="chapter-actions">
                 {index > 0 && (
                   <button
                     className="text-action"
@@ -642,28 +939,113 @@ export default function ArchiveExperience() {
                     </button>
                   </>
                 )}
-              </div>
+              </div>}
             </div>
           </section>
         ))}
       </div>
 
+      {currentBranch && (
+        <aside
+          className={`branch-explorer branch-${currentBranch.id}`}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={`branch-title-${currentBranch.id}`}
+        >
+          <div className="branch-scene" aria-hidden="true">
+            <div className="branch-scene-image" />
+            <div className="branch-scene-grade" />
+            <div className="branch-sensory">
+              {Array.from({ length: 10 }, (_, index) => (
+                <i key={index} />
+              ))}
+            </div>
+            <div className="branch-scene-noise" />
+          </div>
+
+          <button
+            className="branch-return"
+            type="button"
+            onClick={closeBranch}
+          >
+            <span aria-hidden="true">
+              {currentBranch.direction === "left" ? "→" : "←"}
+            </span>
+            返回中央遗迹 <small>ESC</small>
+          </button>
+
+          <div className="branch-copy">
+            <div className="branch-meta">
+              <span>{currentBranch.code}</span>
+              <span>{currentBranch.systemLabel}</span>
+            </div>
+            <h2
+              id={`branch-title-${currentBranch.id}`}
+              ref={branchHeadingRef}
+              tabIndex={-1}
+            >
+              <span>{currentBranch.titleEn}</span>
+              {currentBranch.titleZh}
+            </h2>
+            <p>{currentBranch.description}</p>
+            <blockquote>{currentBranch.quote}</blockquote>
+
+            <div className="branch-records" aria-label="已探测档案状态">
+              {currentBranch.records.map((record, index) => (
+                <span key={record}>
+                  <i>{String(index + 1).padStart(2, "0")}</i>
+                  {record}
+                </span>
+              ))}
+            </div>
+
+            <div className="branch-actions">
+              <button
+                className="primary-action"
+                type="button"
+                onClick={openArchiveIndex}
+              >
+                <span>OPEN PUBLIC RECORD</span>
+                在档案索引中查看
+                <i aria-hidden="true">↗</i>
+              </button>
+              <button className="text-action" type="button" onClick={closeBranch}>
+                回到三向节点
+              </button>
+            </div>
+          </div>
+
+          <div className="branch-axis" aria-hidden="true">
+            <span className={currentBranch.id === "memory" ? "is-active" : ""}>
+              MEMORY
+            </span>
+            <i />
+            <span>HUB</span>
+            <i />
+            <span className={currentBranch.id === "idea" ? "is-active" : ""}>
+              IDEA
+            </span>
+          </div>
+        </aside>
+      )}
+
       <div className="chapter-announcer" aria-live="polite" aria-atomic="true">
         当前节点：{currentChapter.titleZh}
+        {currentBranch ? `，${currentBranch.titleZh}分支` : ""}
       </div>
 
       {gateOpen && (
-        <div className="entry-gate">
+        <div
+          className="entry-gate"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="entry-title"
+        >
           <div className="gate-backdrop" />
           <div className="gate-grid">
-            <div className="gate-sigil">
-              <EchoSeal />
-              <span>ARCHIVE / M-01</span>
-            </div>
-
             <div className="gate-copy">
               <p className="gate-kicker">A PERSONAL ARCHIVE AFTER HUMANITY</p>
-              <h1>
+              <h1 id="entry-title">
                 MONUMENTS
                 <br />
                 OF ECHOES
@@ -722,8 +1104,23 @@ export default function ArchiveExperience() {
                   <span className="preference-dot" />
                   {reducedMotion ? "简化动态" : "完整动态"}
                 </button>
-                <span>典型主线约42秒 · 可随时跳过</span>
+                <span>完整主线约90秒 · 可随时跳过</span>
               </div>
+            </div>
+
+            <div className="gate-sigil">
+              <EchoSeal />
+              <span>ARCHIVE / M-01</span>
+            </div>
+
+            <div className="gate-route" aria-hidden="true">
+              <span>ENTRY VECTOR / RECOVERED</span>
+              <ol>
+                <li><i />荒原巨构</li>
+                <li><i />通讯中继</li>
+                <li><i />中央遗迹</li>
+              </ol>
+              <p>MAINLINE ↓ · BRANCH ← →</p>
             </div>
 
             <div className="gate-status" aria-hidden="true">
@@ -795,38 +1192,22 @@ export default function ArchiveExperience() {
             </div>
 
             <div className="index-list">
-              {archiveNodes.map((node) =>
-                node.status === "sealed" ? (
-                  <div
-                    className="index-node is-sealed"
-                    key={node.id}
-                    aria-disabled="true"
-                  >
-                    <span className="node-code">{node.code}</span>
-                    <div>
-                      <strong>{node.title}</strong>
-                      <span>{node.english}</span>
-                      <p>{node.summary}</p>
-                    </div>
-                    <span className="node-status">{node.status}</span>
+              {publicArchiveNodes.map((node) => (
+                <button
+                  className="index-node"
+                  key={node.id}
+                  type="button"
+                  onClick={() => chooseNode(node)}
+                >
+                  <span className="node-code">{node.code}</span>
+                  <div>
+                    <strong>{node.title}</strong>
+                    <span>{node.english}</span>
+                    <p>{node.summary}</p>
                   </div>
-                ) : (
-                  <button
-                    className="index-node"
-                    key={node.id}
-                    type="button"
-                    onClick={() => chooseNode(node)}
-                  >
-                    <span className="node-code">{node.code}</span>
-                    <div>
-                      <strong>{node.title}</strong>
-                      <span>{node.english}</span>
-                      <p>{node.summary}</p>
-                    </div>
-                    <span className="node-status">{node.status}</span>
-                  </button>
-                ),
-              )}
+                  <span className="node-status">{node.status}</span>
+                </button>
+              ))}
             </div>
 
             <div className="index-footer">

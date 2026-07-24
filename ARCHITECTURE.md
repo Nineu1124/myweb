@@ -9,7 +9,7 @@ The MVP is a single-page, progressively enhanced narrative portfolio.
 - The public experience has two equal entry paths:
   - **Begin recovery**: a user-controlled cinematic route.
   - **Open archive index**: immediate access to all public destinations.
-- The canonical route takes roughly 42 seconds when continuously advanced. It never auto-plays or locks the user into a timed film.
+- The canonical route takes roughly 90 seconds when continuously advanced. It never auto-plays or locks the user into a timed film.
 
 ## Narrative state machine
 
@@ -22,8 +22,8 @@ ENTRY
        ↓
     RELAY
        ↓
-    NEXUS
-       ↓
+MEMORY ← NEXUS → IDEA
+          ↓
     FORGE
        ↓
     IDENTITY
@@ -31,7 +31,7 @@ ENTRY
     RESOLVED
 ```
 
-Every chapter can move forward or backward. `INDEX` is reachable from every state. `NEXUS` exposes optional previews for Idea and Memory without forcing either branch into the main route.
+Every chapter can move forward or backward. `INDEX` is reachable from every state. `NEXUS` is the mixed-axis junction: Memory opens to the left, Idea opens to the right, and Forge continues downward. Both branches are full-viewport environments and return to the same hub without changing the mainline position.
 
 ## Visual system
 
@@ -58,7 +58,7 @@ Each archive module derives from one incomplete-ring family:
 
 - React renders the semantic page and interaction state.
 - CSS renders the fixed scene compositor, vignettes, fog, rings, scan lines, and transitions.
-- Original raster artwork provides the wasteland, archive nexus, and observatory plates.
+- Original raster artwork provides the wasteland, archive nexus, observatory, memory reservoir, and migrating-thoughts plates.
 - No runtime 3D engine is required for the MVP.
 - Scene images are loaded progressively; only the first scene is eager.
 - `prefers-reduced-motion` removes camera pushes, parallax, pulsing, scanning, and smooth scrolling while preserving all narrative content.
@@ -76,13 +76,13 @@ type ArchivePreferences = {
 };
 ```
 
-No account, database, or cross-domain authentication is part of this MVP. The Love archive appears only as a sealed narrative trace.
+The active Nexus branch is also mirrored into `?branch=memory|idea#chapter-nexus`, so a branch can be restored or deep-linked without duplicating pages. No account, database, or cross-domain authentication is part of this MVP. The Love archive is excluded from the public index and appears only as a sealed narrative trace.
 
 ## Responsive behavior
 
-- Desktop: fixed cinematic viewport, chapter controls, subtle pointer parallax.
-- Mobile: vertical chapter cards over portrait-friendly crops; no required horizontal gesture.
-- Keyboard: Tab for controls, Enter/Space for actions, Arrow keys/Page Up/Page Down for chapter navigation, Escape for the archive index.
+- Desktop: fixed cinematic viewport, vertical mainline chapters, a three-direction Nexus, full-viewport branches, and subtle pointer parallax.
+- Mobile: vertical mainline chapters over portrait-friendly crops; the Nexus direction row uses local horizontal scroll-snap and equivalent explicit buttons.
+- Keyboard: Tab for controls, Enter/Space for actions, Up/Down for mainline navigation, Left/Right for Nexus branches, and Escape to return from overlays.
 - Screen readers: chapter status is announced through a polite live region; decorative visuals are hidden.
 
 ## Component boundaries
@@ -94,6 +94,9 @@ app/page.tsx
        ├─ SceneStage
        ├─ SystemRail
        ├─ ChapterCopy
+       ├─ DirectionalNexus
+       ├─ BranchEnvironment
+       ├─ OracleCompass
        ├─ ArchiveIndex
        ├─ PreferenceControls
        └─ ProgressRail
@@ -105,6 +108,7 @@ Configuration and copy live in `app/archive-data.ts`; interactive behavior lives
 
 - Works, About, and all public archive entries are reachable within two actions from entry.
 - The cinematic route completes without mouse-only or gesture-only interaction.
+- Memory, Forge, and Idea remain visually explicit at the Nexus and are operable by buttons, keyboard, wheel/trackpad, drag, and touch.
 - The page remains readable with images disabled, JavaScript delayed, reduced motion enabled, or audio unavailable.
 - Functional controls never use glitch distortion or low-contrast decorative styling.
 - Build succeeds and the final source is self-contained under `D:\myweb`.
